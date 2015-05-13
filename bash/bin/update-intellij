@@ -1,0 +1,53 @@
+function find-and-replace() {
+  if [ -z "$3" ]; then
+    REPLACE=/
+  else
+    REPLACE=$3
+  fi
+  
+  if [ -z "$2" ]; then
+    echo "This function requires three parameters..."
+    echo "  $1 = original string"
+    echo "  $2 = find string"
+    echo "  $3 = replace string"
+  else
+    echo "${1//$2/$REPLACE}"
+  fi
+}
+
+if [ -z "$1" ]; then
+  echo " "
+  echo "Please provide the full system path, including name and"
+  echo "location (e.g. '/home/user/Downloads/idea-1.1.tar.gz')"
+  echo "of the new idea/intellij tar.gz file.."
+  read TAR
+else
+  TAR=$1
+fi
+if [ -z "$2" ]; then
+  echo "Please provide the full system path, including name and"
+  echo "location (e.g. '/home/user/bin/idea') of the current"
+  echo "idea/intellij install directory.."
+  read SRC
+else
+  SRC=$2
+fi
+
+mkdir tmp-intellij
+cp $TAR ./tmp-intellij
+cd tmp-intellij
+echo "Extracting your tar.."
+tar -xzvf $TAR
+echo " "
+cd ../
+EXTRACTEDDIR=$(ls -d ./*/)
+rm -Rf ~/.old-intellij
+#mkdir ~/.old-intellij
+SRC="$SRC/"
+SRCOLD=$(find-and-replace $SRC/ // /)
+mv $SRCOLD ~/.old-intellij
+mv tmp-intellij/*/ $SRCOLD
+rm -Rf tmp-intellij
+echo " "
+echo "All done! IntelliJ has been updated. You can find the old source files in ~/.old-intellij"
+echo " "

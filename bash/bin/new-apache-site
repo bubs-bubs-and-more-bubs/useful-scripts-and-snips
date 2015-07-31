@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# new-apache-site is a bash script for automating the process 
+# of setting up a new Apache virtual host. This script will 
+# update the Apache vhosts, add the new site to the hosts 
+# file, create the site directory if it doesn’t exist, restart
+# Apache, and launch your site in your browser of choice.
+ 
+if [ "$(whoami)" != "root" ]; then
+  echo "Root privileges are required to run this, try running with sudo..."
+  exit 2
+fi
+
+# Location of your local web site root directory 
+WEBROOT="/var/www/"
+# Location of your hosts file
+HOSTSPATH="/etc/hosts"
+# Apache's available sites vhost directory 
+VHOSTDIR="/etc/apache2/sites-available/"
+# File extension to use for vhost conf file
+EXTENSION=".conf"
+# Domain suffix to append to localhost entry
+DOMAINSUFFIX=".dev"
+# Command to restart/reload apache
+RESTARTCMD="sudo service apache2 restart"
+# Name of vhosts skeleton conf file
+WEBBROWSERCMD="/usr/bin/google-chrome"
+# Name of vhosts skeleton conf file
+SKELETON="skeleton.conf"
+
+if [ "$1" = 'help' ] || [ "$1" = '--help' ] || [ "$1" = '-h' ]; then
+  INSTRUCTIONS=true
+else
+  if [ -z "$1" ]; then
+    echo "What is the site's root directory path?"
+    read SITEROOT
+  else
+    INSTRUCTIONS=false
+    SITEROOT=$1
+  fi
+
+  if [ -z "$2" ]; then
+    echo "What do you want to call this site (this will determine the hostname entry)?"
+    read SITENAME
+  else
+    INSTRUCTIONS=false
+    SITENAME=$2
+  fi
+fi
+
+export LAUNCH_NEW_SITE="$WEBBROWSERCMD http://$SITENAME$DOMAINSUFFIX"
+
+if  [ $INSTRUCTIONS = true ]; then
+  echo $'\nUsage: new-apache-site SITEROOT HOSTNAME\n  (or leave parameters empty for interactive mode)\n\nnew-apache-site is a bash script for automating the process of setting up a new Apache virtual host. This script will update the Apache vhosts, add the new site to the hosts file, create the site directory if it doesn’t exist, restart Apache, and launch your site in your browser of choice.\n\nOptions:\n  -h  This help text.\n'
+else
+  if [ "$SITENAME" != '' ]; then
+    if [ ! -f "$VHOSTDIR$SITENAME.conf" ]; then
+      cp "$VHOSTDIR$SKELETON" "$VHOSTDIR$SITENAME$EXTENSION"
+      echo "Created $VHOSTDIR$SITENAME$EXTENSION file..."
+    else
+      mv "$VHOSTDIR$SITENAME.conf" "$VHOSTDIR$SITENAME$EXTENSION.bak"
+      cp "$VHOSTDIR$SKELETON" "$VHOSTDIR$SITENAME$EXTENSION"
+      echo "Created $VHOSTDIR$SITENAME$EXTENSION file, and made a backup of existing conf.."
+    fi
+    find "$VHOSTDIR$SITENAME$EXTENSION" -type f -exec sed -i "s/SKELETON/$SITENAME/" {} \;
+    find "$VHOSTDIR$SITENAME$EXTENSION" -type f -exec sed -i "s/ServerName $SITENAME/ServerName $SITENAME$DOMAINSUFFIX/" {} \;
+    if [ ! -d "$WEBROOT$SITENAME/" ]; then
+      ln -s $SITEROOT $WEBROOT$SITENAME
+      chmod go+rx $SITEROOT
+      echo "Created symbolic link $WEBROOT$SITENAME/ ..."
+    else
+      echo "Ut-oh! $WEBROOT$SITENAME already exists.."
+    fi
+    sudo echo "127.0.0.1 $SITENAME$DOMAINSUFFIX" >> $HOSTSPATH
+    sudo a2ensite $SITENAME
+    $RESTARTCMD
+    echo "Apache has been reloaded - your site should be ready to use at http://$SITENAME$DOMAINSUFFIX"
+    if  [ $WEBBROWSERCMD != '' ]; then 
+      su $(logname) -c "$LAUNCH_NEW_SITE"
+    fi
+  fi
+fi
